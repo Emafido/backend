@@ -18,9 +18,12 @@ export function buildSummary(data, today = new Date()) {
   const income = fs.monthly_household_income;
   const expenses = fs.monthly_expenses;
   const contribution = fs.monthly_savings_contribution;
+  const hasExpenses = typeof expenses === "number" && !Number.isNaN(expenses) && expenses >= 0;
 
 
-  const history = [...savings_history].sort((a, b) => a.month.localeCompare(b.month));
+  const history = Array.isArray(savings_history)
+    ? [...savings_history].sort((a, b) => String(a?.month || "").localeCompare(String(b?.month || "")))
+    : [];
   const actuals = history.map((h) => h.actual);
   const plannedTotal = sum(history.map((h) => h.planned));
   const actualTotal = sum(actuals);
@@ -32,8 +35,8 @@ export function buildSummary(data, today = new Date()) {
 
 
   const half = Math.floor(actuals.length / 2);
-  const earlierAverage = average(actuals.slice(0, half));
-  const recentAverage = average(actuals.slice(actuals.length - half));
+  const earlierAverage = half > 0 ? average(actuals.slice(0, half)) : 0;
+  const recentAverage = half > 0 ? average(actuals.slice(actuals.length - half)) : 0;
 
   let recentTrend = "not enough data";
   if (actuals.length >= 4) {
@@ -68,11 +71,12 @@ export function buildSummary(data, today = new Date()) {
     currency: customer.currency,
 
     monthlyIncome: income,
-    monthlyExpenses: expenses,
-    expenseSharePercent: round((expenses / income) * 100),
-    incomeAfterExpenses: income - expenses,
+    monthlyExpenses: hasExpenses ? expenses : null,
+    expenseSharePercent: hasExpenses && income > 0 ? round((expenses / income) * 100) : null,
+    incomeAfterExpenses: hasExpenses ? income - expenses : null,
     recentExpensesByCategory,
 
+    goalReached: fs.current_savings_balance >= fs.target_amount,
     currentBalance: fs.current_savings_balance,
     targetAmount: fs.target_amount,
     targetDate: fs.target_date,
@@ -80,10 +84,10 @@ export function buildSummary(data, today = new Date()) {
     amountRemaining,
     monthsRemaining,
     requiredMonthly,
-    requiredShareOfIncomePercent: round((requiredMonthly / income) * 100),
+    requiredShareOfIncomePercent: income > 0 ? round((requiredMonthly / income) * 100) : 0,
 
     monthlySavingsContribution: contribution,
-    savingsRatePercent: round((contribution / income) * 100),
+    savingsRatePercent: income > 0 ? round((contribution / income) * 100) : 0,
     monthlyGap,
     projectedBalanceAtCurrentPace: projectedBalance,
     projectedShortfall,
@@ -93,7 +97,7 @@ export function buildSummary(data, today = new Date()) {
     plannedMonthly,
     averageActualMonthly,
     shortfallVsPlan: Math.max(0, plannedMonthly - averageActualMonthly),
-    percentOfPlanMet: round((actualTotal / plannedTotal) * 100),
+    percentOfPlanMet: plannedTotal > 0 ? round((actualTotal / plannedTotal) * 100) : 0,
     monthsMetPlan: history.length - monthsBelowPlan,
     monthsBelowPlan,
     monthsWithZero,
